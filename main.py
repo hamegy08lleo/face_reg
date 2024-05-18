@@ -1,62 +1,87 @@
+import sqlite3
 import cv2
-import numpy as np
+import os
+import tkinter as tk
+from tkinter import simpledialog, Button
+import time
+from face_reg import face_reg
+from train import train
 
-# Load the Haar cascade file
-face_cascade = cv2.CascadeClassifier('haar_cascade_files/haarcascade_frontalface_default.xml')
-
-# Check if the cascade file has been loaded correctly
-if face_cascade.empty():
-    raise IOError('Unable to load the face cascade classifier xml file')
-
-# Initialize the video capture object
 cap = cv2.VideoCapture(0)
 
-# Create an LBPH face recognizer
-recognizer = cv2.face.LBPHFaceRecognizer_create()
+dataset_dir = 'dataset'
 
-# Load your trained model
-# Make sure to train your model first
-recognizer.read('model.yml')
+os.makedirs(dataset_dir, exist_ok=True)
 
-# Define the scaling factor
 scaling_factor = 1
 
-# Iterate until the user hits the 'Esc' key
-while True:
-    # Capture the current frame
-    _, frame = cap.read()
+connection = sqlite3.connect('Person.db')
+cursor = connection.cursor()
+cursor.execute("PRAGMA table_info('Persons')")
+table_exists = cursor.fetchall()
 
-    # Resize the frame
-    frame = cv2.resize(frame, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
+if not table_exists:
+    cursor.execute(
+        '''
+        CREATE TABLE Persons(
+            personID integer primary key autoincrement,
+            name text
+        )
+        '''
+    )
+    connection.commit()
 
-    # Convert to grayscale
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+def capture_images():
+    start_time = time.time()
+    
+    root = tk.Tk()
+    root.withdraw()
+    name = simpledialog.askstring("Input", "Enter the name of the person",
+                                   parent=root)
+    if not name: 
+        return
+    
+    cursor.execute(
+    "insert into Persons(name) values(?)", (name, )
+    )
+    noLoop = 50
+    print(name)
+    while noLoop > 0:
+        _, frame = cap.read()
+        
+        cv2.imshow('Webcam', frame)
 
-    # Run the face detector on the grayscale image
-    face_rects = face_cascade.detectMultiScale(gray, 1.3, 5)
+        cursor.execute(
+            '''
+                SELECT MAX(personID) FROM Persons 
+                WHERE name = ?
+            ''', (name, )
+        )
+        personID = cursor.fetchone()[0]
+        
+        if time.time() - start_time > 0.1:
+            img_name = os.path.join(dataset_dir, f'{personID}.{int(time.time())}.png')
+            cv2.imwrite(img_name, frame)
+            noLoop -= 1
+            start_time = time.time()
+            
+        c = cv2.waitKey(1)
+        if c == 27:
+            break
 
-    # For each face detected
-    for (x,y,w,h) in face_rects:
-        # Extract the ROI of the face from the grayscale image
-        roi_gray = gray[y:y+h, x:x+w]
-        # Try to recognize the face
-        label, confidence = recognizer.predict(roi_gray)
-        # Draw a rectangle around the face
-        cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), 3)
-        # Display the label and confidence score
-        text = f'{label}, {confidence:.2f}'
-        cv2.putText(frame, text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+    cap.release()
 
-    # Display the output
-    cv2.imshow('Face Detector', frame)
+    cv2.destroyAllWindows()
+    train()
 
-    # Check if the user hit the 'Esc' key
-    c = cv2.waitKey(1)
-    if c == 27:
-        break
+    
+def quit(): 
+    root.quit()
+    root.destroy()
+root = tk.Tk()
 
-# Release the video capture object
-cap.release()
-
-# Close all the windows
-cv2.destroyAllWindows()
+Button(root, text="Start Capturing", command=capture_images).pack()
+Button(root, text="Start Face Recognition", command=face_reg).pack()
+root.protocol("WM_DELETE_WINDOW", quit)
+root.mainloop()
+connection.close()
