@@ -7,7 +7,6 @@ import time
 from face_reg import face_reg
 from train import train
 
-cap = cv2.VideoCapture(0)
 
 dataset_dir = 'dataset'
 
@@ -17,6 +16,8 @@ scaling_factor = 1
 
 
 def capture_images():
+    cap = cv2.VideoCapture(0)
+    
     start_time = time.time()
     
     root = tk.Tk()
@@ -49,7 +50,7 @@ def capture_images():
         "INSERT INTO Persons(name) values(?)", (name, )
     )
     connection.commit()
-    noLoop = 50
+    noLoop = 100
     print(name)
     while noLoop > 0:
         _, frame = cap.read()
@@ -69,8 +70,6 @@ def capture_images():
                        WHERE personID = ?
                        ''', (personID, )
                        )
-        tmp = cursor.fetchone()[0]
-        print("TMP", tmp)
         
         if time.time() - start_time > 0.1:
             img_name = os.path.join(dataset_dir, f'{personID}.{int(time.time())}.png')

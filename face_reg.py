@@ -33,8 +33,8 @@ def face_reg():
             connection = sqlite3.connect("Person.db")
             cursor = connection.cursor() 
             cursor.execute("SELECT name FROM Persons WHERE personID = (?)", (id, ))
-            name = cursor.fetchone()[0]
-            
+            result = cursor.fetchone()
+            name = result[0] if result else "Unknown"
             connection.close()
             
             text = f'{name}'
