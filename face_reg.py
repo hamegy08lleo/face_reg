@@ -19,8 +19,6 @@ def face_reg():
 
     scaling_factor = 1
     
-    connection = sqlite3.connect("Person.db")
-    cursor = connection.cursor()
 
     while True:
         _, frame = cap.read()
@@ -32,8 +30,12 @@ def face_reg():
             id, confidence = recognizer.predict(roi_gray)
             cv2.rectangle(frame, (x,y), (x+w,y+h), (255, 172, 189), 3)
             
+            connection = sqlite3.connect("Person.db")
+            cursor = connection.cursor() 
             cursor.execute("SELECT name FROM Persons WHERE personID = (?)", (id, ))
             name = cursor.fetchone()[0]
+            
+            connection.close()
             
             text = f'{name}'
             cv2.putText(frame, text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 172, 189), 2)
@@ -42,6 +44,5 @@ def face_reg():
         if c == 27:
             break
 
-    connection.close()
     cap.release()
     cv2.destroyAllWindows()
